@@ -4,20 +4,22 @@ object BTree {
 
   /**Byte sizes of node*/
   object Sizes {
-    def `type`: Short = 2
+    
+    def `type` = 4
     def nodeType = `type`
-    def nkeys: Short = 2
-    def psize: Short = 8
+    
+    def nkeys = 4
+    def psize = 8
     /** used keys instead of nkeys */
-    def pointers(keys: Short): Short = (psize * keys).toShort
-    def offsets(keys: Short): Short = (keys * 2).toShort
+    def pointers(keys:Int) = (psize * keys)
+    def offsets(keys:Int) = (keys * 2)
 
     val HEADER = Sizes.`type` + Sizes.nkeys
 
-    def klen: Short = 2.toShort
-    def vlen: Short = 2.toShort
-    def kvLen: Short = (klen + vlen).toShort 
-    def offsetlen: Short = 2.toShort
+    def klen = 4
+    def vlen = 4
+    def kvLen = (klen + vlen) 
+    def offsetlen = 4
   }
 
   object Const {
@@ -29,7 +31,7 @@ object BTree {
     val BTREE_MAX_KEY_SIZE = 1000
     val BTREE_MAX_VAL_SIZE = 3000
     /**following structure of a packet*/
-    val node1max = Sizes.HEADER + Sizes.pointers(1) + Sizes.offsets(1) + Sizes.klen + Sizes.vlen + 4 + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE
+    val node1max = Sizes.HEADER + Sizes.pointers(1) + Sizes.offsets(1) + Sizes.klen + Sizes.vlen + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE
     assert(node1max < BTREE_PAGE_SIZE)
   }
 
