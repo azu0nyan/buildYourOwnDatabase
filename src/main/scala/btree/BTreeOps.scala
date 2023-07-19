@@ -17,7 +17,7 @@ object BTreeOps:
   def leafInsert(newNode: BNode, old: BNode, id: Int, key: Array[Byte], value: Array[Byte]): Unit =
     newNode.setHeader(BNODE_LEAF, old.nkeys + 1)
     nodeAppendRange(newNode, old, 0, 0, id)
-    nodeAppendKV(newNode,  id, 0, key, value)
+    nodeAppendKV(newNode, id, 0, key, value)
     nodeAppendRange(newNode, old, id + 1, id, old.nkeys - id)
   end leafInsert
 
@@ -28,7 +28,7 @@ object BTreeOps:
     nodeAppendRange(newNode, old, id + 1, id + 1, old.nkeys - id - 1)
   end leafUpdate
 
-  def nodeAppendRange(newNode: BNode,old:BNode,  dstNew: Int, srcOld: Int, n: Int): Unit =
+  def nodeAppendRange(newNode: BNode, old: BNode, dstNew: Int, srcOld: Int, n: Int): Unit =
   //assert(srcOld + n <= old.nkeys())
   //assert(dstNew + n <= new.nkeys())
     if (n > 0)
@@ -46,7 +46,7 @@ object BTreeOps:
       old.data.slice(begin, end).copyToArray(newNode.data, newNode.kvPos(dstNew))
   end nodeAppendRange
 
-  def nodeAppendKV(newNode: BNode,  id: Int, ptr: Int, key: Array[Byte], value: Array[Byte]): Unit =
+  def nodeAppendKV(newNode: BNode, id: Int, ptr: Int, key: Array[Byte], value: Array[Byte]): Unit =
     newNode.setPtr(id, ptr)
 
     val pos = newNode.kvPos(id)
@@ -71,17 +71,17 @@ object BTreeOps:
     node.btype match
       case `BNODE_LEAF` =>
         //// leaf, node.getKey(idx) <= key
-        if(util.Arrays.equals(key, node.getKey(id)))
-          // found the key, update it.
-             leafUpdate(newNode, node, id, key,    value )
+        if (util.Arrays.equals(key, node.getKey(id)))
+        // found the key, update it.
+          leafUpdate(newNode, node, id, key, value)
         else
-          //// insert it after the position.
+        //// insert it after the position.
           leafInsert(newNode, node, id, key, value)
       case `BNODE_NODE` =>
         // internal node, insert it to a kid node.
-         nodeInsert(tree, newNode, node, id, key,   value)
+        nodeInsert(tree, newNode, node, id, key, value)
       case _ =>
-        throw  new RuntimeException(s"Bad node type ${node.btype}")
+        throw new RuntimeException(s"Bad node type ${node.btype}")
 
     newNode
 
@@ -94,13 +94,44 @@ object BTreeOps:
     val knode = tree.get(kptr)
     tree.del(kptr)
     // recursive insertion to the kid node
-    val knodeIns = treeInsert(tree, knode, key,  value )
-//    val (nsplit, slited) = nodeSplit3(knode)
-    // update the kid links
-//    nodeReplaceKidN(tree, new, node, idx, splited[: nsplit  ]... )
+    val knodeIns = treeInsert(tree, knode, key, value)
+  //    val (nsplit, slited) = nodeSplit3(knode)
+  // update the kid links
+  //    nodeReplaceKidN(tree, new, node, idx, splited[: nsplit  ]... )
   end nodeInsert
 
+  /**
+   * // split a bigger-than-allowed node into two.
+   * // the second node always fits on a page.
+   */
+  def nodeSplit2(left: BNode, right: BNode, old: BNode): Unit = {
 
+  }
+
+  def nodeSplit3(old: BNode): Seq[BNode] =
+    if (old.nbytes <= BTREE_PAGE_SIZE)
+      Seq(new BNode(old.data.take(BTREE_PAGE_SIZE)))
+    else
+      val left = new BNode(Array.ofDim[Byte](2 * BTREE_PAGE_SIZE))
+      val right = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+      nodeSplit2(left, right, old)
+      if (left.nbytes <= BTREE_PAGE_SIZE)
+        Seq(new BNode(left.data.take(BTREE_PAGE_SIZE)), right)
+      else
+        val leftleft = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+        val middle = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+        nodeSplit2(leftleft, middle, left)
+        //assert(leftleft.nbytes() <= BTREE_PAGE_SIZE)
+        Seq(leftleft, middle, right)
+  end nodeSplit3
+
+  def nodeReplaceKidN(tree: BTree, newNode: BNode, old: BNode, id: Int, kids: Seq[BNode]):Unit =
+    newNode.setHeader(BNODE_NODE, old.nkeys + kids.size - 1)
+    nodeAppendRange(newNode, old, 0, 0, id)
+    for ((node, i) <- kids.zipWithIndex)
+      nodeAppendKV(newNode, id + i, tree.alloc(node), node.getKey(0), Array.ofDim[Byte](0))
+    nodeAppendRange(newNode, old, id + kids.size, id + 1, old.nkeys - (id + 1))
+  end nodeReplaceKidN
 
 
 end BTreeOps
