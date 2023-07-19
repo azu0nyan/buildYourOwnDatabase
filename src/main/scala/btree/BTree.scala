@@ -4,10 +4,10 @@ object BTree {
 
   /**Byte sizes of node*/
   object Sizes {
-    
+
     def `type` = 4
     def nodeType = `type`
-    
+
     def nkeys = 4
     def psize = 8
     /** used keys instead of nkeys */
@@ -22,6 +22,7 @@ object BTree {
     def offsetlen = 4
   }
 
+    
   object Const {
     val BNODE_NODE = 1
     val BNODE_LEAF = 2
@@ -49,6 +50,7 @@ object BTree {
     /**delete page*/
     def del(p: Pointer): Unit
   }
+ 
 
 
 

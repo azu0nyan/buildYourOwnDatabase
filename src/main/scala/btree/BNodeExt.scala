@@ -1,21 +1,31 @@
 package btree
 
-import btree.BTree.{BNode, Sizes}
+import btree.BTree.Const.BNODE_LEAF
+import btree.BTree.{BNode, Pointer, Sizes}
 
 import java.nio.ByteBuffer
 import java.util
+import scala.annotation.tailrec
+
+/*
+| type | nkeys | pointers    | offsets   | key-values
+| 4B  | 4B     | nkeys * 8B | nkeys * 4B | ...
+This is the format of the KV pair. Lengths followed by data.
+| klen | vlen | key | val |
+| 4B   | 4B   | ... | ... |
+*/
 extension (node: BNode)
   def btype: Int = ByteBuffer.wrap(node.data).getInt(0)
   def nkeys: Int = ByteBuffer.wrap(node.data).getInt(4)
   def setHeader(btype: Int, nkeys: Int): Unit =
     ByteBuffer.wrap(node.data).putInt(0, btype).putInt(4, nkeys)
 
-  def getPtr(id: Int):Long =
+  def getPtr(id: Int): Pointer =
     //assert(id < node.nkeys) todo check
     val pos = Sizes.HEADER + Sizes.psize * id
     ByteBuffer.wrap(node.data).getLong(pos)
-    
-  def setPtr(id: Int, ptr: Long): Unit =
+
+  def setPtr(id: Int, ptr: Pointer): Unit =
     //assert(id < node.nkeys) todo check
     val pos = Sizes.HEADER + Sizes.psize * id
     ByteBuffer.wrap(node.data).putLong(pos, ptr)
@@ -27,18 +37,18 @@ extension (node: BNode)
   determine the size of the node.
   */
   def offsetPos(id: Int): Int =
-    //assert(1 <= id && id <= node.nkeys) todo check
+  //assert(1 <= id && id <= node.nkeys) todo check
     (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * (id - 1))
 
   def getOffset(id: Int): Int =
-    if( id == 0) 0
+    if (id == 0) 0
     else ByteBuffer.wrap(node.data).getInt(offsetPos(id))
 
   def setOffset(id: Int, offset: Int): Unit =
     ByteBuffer.wrap(node.data).putInt(offsetPos(id), offset)
 
   def kvPos(id: Int): Int =
-    //assert(id <= nkeys)
+  //assert(id <= nkeys)
     (Sizes.HEADER + Sizes.psize * nkeys + Sizes.klen * nkeys + getOffset(id))
 
   def getKey(id: Int): Array[Byte] =
@@ -56,9 +66,27 @@ extension (node: BNode)
 
   def nbytes: Int = kvPos(nkeys)
 
-  // returns the first kid node whose range intersects the key. (kid[i] <= key)
-  def nodeLookupLE(key: Array[Byte]): Int =    
-    (1 until nkeys).find(i => util.Arrays.compare(getKey(i), key) >= 0).getOrElse(0)
+  /** returns the first kid node whose range intersects the key. (kid[i] <= key)
+   * the first key is a copy from the parent node,
+   * thus it's always less than or equal to the key.
+   */
+  def nodeLookupLE(key: Array[Byte]): Int =
+    val max = nkeys
+    @tailrec
+    def kRec(id: Int): Int =
+      if (id >= max)
+        id - 1
+      else
+        val cmp = util.Arrays.compare(getKey(id), key)
+        if (cmp < 0)
+          kRec(id + 1)
+        else if(cmp == 0)
+          id
+        else id - 1
+    kRec(0) // can be 1
+
+
+end extension
 
 
 
