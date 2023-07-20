@@ -40,6 +40,8 @@ object BTree {
 
   type Pointer = Long
   trait BTree {
+    
+    def setRoot(p: Pointer): Unit 
     // pointer (a nonzero page number)
     def root: Pointer
     // callbacks for managing on-disk pages

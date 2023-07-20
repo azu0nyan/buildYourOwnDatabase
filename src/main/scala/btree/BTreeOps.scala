@@ -153,6 +153,14 @@ object BTreeOps:
     nodeAppendRange(newNode, old, id + kids.size, id + 1, old.nkeys - (id + 1))
   end nodeReplaceKidN
 
+  def nodeReplace2Kid(newNode: BNode, old: BNode, id: Int, ptr: Pointer, key: Array[Byte]) =
+    newNode.setHeader(BNODE_NODE, old.nkeys - 1)
+    nodeAppendRange(newNode, old, 0, 0, id)
+    nodeAppendKV(newNode, id, ptr, key, Array.ofDim[Byte](0))
+    nodeAppendRange(newNode, old, id + 1, id + 2, old.nkeys - (id + 2))
+  end nodeReplace2Kid
+
+
 
   /** remove a key from a leaf node */
   def leafDelete(newNode: BNode, old: BNode, id: Int): Unit =
@@ -203,12 +211,10 @@ object BTreeOps:
       val merged = sibling.nbytes + updated.nbytes - Sizes.HEADER
       merged <= BTREE_PAGE_SIZE
     })
-      MergeDir.RIGHT(node.getPtr(id + 1))
+      MergeDir.RIGHT(tree.get(node.getPtr(id + 1)))
     else
       MergeDir.NONE
 
-  def nodeReplace2Kid(newNode: BNode, node: BNode, id: Int, ptr: Pointer, key: Array[Byte]) = ???
-  def nodeReplaceKidN(tree: BTree, newNode: BNode, node: BNode, id: Int, updated: BNode) = ???
 
   def nodeDelete(tree: BTree, node: BNode, id: Int, key: Array[Byte]): Option[BNode] =
     val kptr = node.getPtr(id)
@@ -230,10 +236,63 @@ object BTreeOps:
             nodeReplace2Kid(newNode, node, id - 1, tree.alloc(merged), merged.getKey(0))
           case MergeDir.NONE =>
             //assert(updated.nkeys() > 0)
-            nodeReplaceKidN(tree, newNode, node, id, updated)
+            nodeReplaceKidN(tree, newNode, node, id, Seq(updated))
         Some(newNode)
       case None => None
   end nodeDelete
+
+  /**
+   * The height of the tree will be reduced by one when:
+   * 1. The root node is not a leaf.
+   * 2. The root node has only one child.
+   */
+  def delete(tree: BTree, key: Array[Byte]): Boolean =
+  //assert(len(key) != 0)
+  //assert(len(key) <= BTREE_MAX_KEY_SIZE)
+    if (tree.root == 0) false
+    else
+      treeDelete(tree, tree.get(tree.root), key) match
+        case Some(updated) =>
+          tree.del(tree.root)
+          if (updated.btype == BNODE_NODE && updated.nkeys == 1)
+            tree.setRoot(updated.getPtr(0))
+          else
+            tree.setRoot(tree.alloc(updated))
+          true
+        case None =>
+          false
+  end delete
+
+  def insert(tree: BTree, key: Array[Byte], value: Array[Byte]): Unit =
+  //assert(len(key) != 0)
+  //assert(len(key) <= BTREE_MAX_KEY_SIZE)
+  //assert(len(val) <= BTREE_MAX_VAL_SIZE)
+    if (tree.root == 0)
+      //create first node
+      val root = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+      root.setHeader(BNODE_LEAF, 2)
+      // a dummy key, this makes the tree cover the whole key space.
+      // thus a lookup can always find a containing node.
+      nodeAppendKV(root, 0, 0, Array.ofDim[Byte](0), Array.ofDim[Byte](0))
+      nodeAppendKV(root, 1, 0, key, value)
+      tree.setRoot(tree.alloc(root))
+    else
+      val node = tree.get(tree.root)
+      tree.del(tree.root)
+      val nodeIns = treeInsert(tree, node, key, value)
+      val splited = nodeSplit3(nodeIns)
+      if (splited.size > 1)
+        // the root was split, add a new level.
+        val root = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+        root.setHeader(BNODE_NODE, splited.size)
+        for ((knode, id) <- splited.zipWithIndex)
+          val kptr = tree.alloc(knode)
+          val kkey = knode.getKey(0)
+          nodeAppendKV(root, id, kptr, kkey, Array.ofDim[Byte](0))
+        tree.setRoot(tree.alloc(root))
+      else
+        tree.setRoot(tree.alloc(splited.head))
+  end insert
 
 
 end BTreeOps
