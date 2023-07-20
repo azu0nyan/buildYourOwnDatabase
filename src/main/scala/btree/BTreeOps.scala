@@ -109,7 +109,7 @@ object BTreeOps:
 
     val (rightSize, minRightId) = ((old.nkeys - 1) to 0).foldRight((Sizes.HEADER, old.nkeys - 1)) {
       case (id, (currentSize, minId)) =>
-        val kvLen = old.getKey(id).length + old.getVal(id).length //todo use offsets to calculate
+        val kvLen = old.getKey(id).length + old.getVal(id).length //todo use offsets to calculate or mb do NodeAppend while traversing
         if (currentSize + kvOverhead + kvLen <= BTREE_PAGE_SIZE)
           (currentSize + kvOverhead + kvLen, id)
         else
@@ -153,6 +153,12 @@ object BTreeOps:
     nodeAppendRange(newNode, old, id + kids.size, id + 1, old.nkeys - (id + 1))
   end nodeReplaceKidN
 
+
+  def leafDelete(newNode: BNode, old: BNode, id: Int): Unit = {
+    newNode.setHeader(BNODE_LEAF, old.nkeys - 1)
+    nodeAppendRange(newNode, old, 0, 0, id)
+    nodeAppendRange(newNode, old, id, id + 1, old.nkeys - (id + 1))
+  }
 
 end BTreeOps
 
