@@ -51,7 +51,7 @@ object BTreeOps:
 
     val pos = newNode.kvPos(id)
     ByteBuffer.wrap(newNode.data).putInt(pos, key.length)
-    ByteBuffer.wrap(newNode.data).putInt(pos + Sizes.klen, key.length)
+    ByteBuffer.wrap(newNode.data).putInt(pos + Sizes.klen, value.length)
     key.copyToArray(newNode.data, pos + Sizes.klen + Sizes.vlen)
     value.copyToArray(newNode.data, pos + Sizes.klen + Sizes.vlen + key.length)
     // the offset of the next key
