@@ -44,7 +44,7 @@ object BTree {
     def root: Pointer
     // callbacks for managing on-disk pages
     /** dereference a pointer */
-    def get(p: Pointer): Option[BNode]
+    def get(p: Pointer): BNode
     /**allocate new page */
     def alloc(bnode: BNode): Pointer
     /**delete page*/

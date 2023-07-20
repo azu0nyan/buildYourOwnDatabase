@@ -91,7 +91,7 @@ object BTreeOps:
   def nodeInsert(tree: BTree, newNode: BNode, node: BNode, id: Int, key: Array[Byte], value: Array[Byte]): Unit =
     // get and deallocate the kid node
     val kptr = node.getPtr(id)
-    val knode = tree.get(kptr).get
+    val knode = tree.get(kptr)
     tree.del(kptr)
     // recursive insertion to the kid node
     val knodeIns = treeInsert(tree, knode, key, value)
@@ -189,15 +189,30 @@ object BTreeOps:
     nodeAppendRange(newNode, left, left.nkeys, 0, right.nkeys)
   end nodeMerge
 
-  def shouldMerge(tree: BTree, node: BNode, id: Int, updated: BNode): MergeDir = ???
-
+  def shouldMerge(tree: BTree, node: BNode, id: Int, updated: BNode): MergeDir =
+    if (updated.nbytes > BTREE_PAGE_SIZE / 4)
+      MergeDir.NONE
+    else if (id > 0 && {
+      val sibling = tree.get(node.getPtr(id - 1))
+      val merged = sibling.nbytes + updated.nbytes - Sizes.HEADER
+      merged <= BTREE_PAGE_SIZE
+    })
+      MergeDir.LEFT(tree.get(node.getPtr(id - 1)))
+    else if (id + 1 < node.nkeys && {
+      val sibling = tree.get(node.getPtr(id + 1))
+      val merged = sibling.nbytes + updated.nbytes - Sizes.HEADER
+      merged <= BTREE_PAGE_SIZE
+    })
+      MergeDir.RIGHT(node.getPtr(id + 1))
+    else
+      MergeDir.NONE
 
   def nodeReplace2Kid(newNode: BNode, node: BNode, id: Int, ptr: Pointer, key: Array[Byte]) = ???
   def nodeReplaceKidN(tree: BTree, newNode: BNode, node: BNode, id: Int, updated: BNode) = ???
 
   def nodeDelete(tree: BTree, node: BNode, id: Int, key: Array[Byte]): Option[BNode] =
     val kptr = node.getPtr(id)
-    treeDelete(tree, tree.get(kptr).get, key) match
+    treeDelete(tree, tree.get(kptr), key) match
       case Some(updated) =>
         tree.del(kptr)
         val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
