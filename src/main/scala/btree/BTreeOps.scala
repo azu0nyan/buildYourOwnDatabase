@@ -1,7 +1,7 @@
 package btree
 
 import btree.BTree.Const.*
-import btree.BTree.{BNode, BTree, Sizes}
+import btree.BTree.{BNode, BTree, Pointer, Sizes}
 
 import java.nio.ByteBuffer
 import java.util
@@ -46,7 +46,7 @@ object BTreeOps:
       old.data.slice(begin, end).copyToArray(newNode.data, newNode.kvPos(dstNew))
   end nodeAppendRange
 
-  def nodeAppendKV(newNode: BNode, id: Int, ptr: Int, key: Array[Byte], value: Array[Byte]): Unit =
+  def nodeAppendKV(newNode: BNode, id: Int, ptr: Pointer, key: Array[Byte], value: Array[Byte]): Unit =
     newNode.setPtr(id, ptr)
 
     val pos = newNode.kvPos(id)
@@ -91,11 +91,11 @@ object BTreeOps:
   def nodeInsert(tree: BTree, newNode: BNode, node: BNode, id: Int, key: Array[Byte], value: Array[Byte]): Unit =
     // get and deallocate the kid node
     val kptr = node.getPtr(id)
-    val knode = tree.get(kptr)
+    val knode = tree.get(kptr).get
     tree.del(kptr)
     // recursive insertion to the kid node
     val knodeIns = treeInsert(tree, knode, key, value)
-    val splitted = nodeSplit3(knode)
+    val splited = nodeSplit3(knode)
     // update the kid links
     nodeReplaceKidN(tree, newNode, node, id, splited)
   end nodeInsert
@@ -105,6 +105,26 @@ object BTreeOps:
    * // the second node always fits on a page.
    */
   def nodeSplit2(left: BNode, right: BNode, old: BNode): Unit = {
+    val kvOverhead = Sizes.psize + Sizes.kvLen
+
+    val (rightSize, minRightId) = ((old.nkeys - 1) to 0).foldRight((Sizes.HEADER, old.nkeys - 1)) {
+      case (id, (currentSize, minId)) =>
+        val kvLen = old.getKey(id).length + old.getVal(id).length //todo use offsets to calculate
+        if (currentSize + kvOverhead + kvLen <= BTREE_PAGE_SIZE)
+          (currentSize + kvOverhead + kvLen, id)
+        else
+          (currentSize, minId)
+    }
+
+    val rightNKeys = old.nkeys - minRightId
+    left.setHeader(old.btype, minRightId) //todo check header
+    right.setHeader(old.btype, rightNKeys)
+
+    for (i <- 0 until minRightId)
+      nodeAppendKV(left, i, old.getPtr(i), old.getKey(i), old.getVal(i))
+
+    for (i <- 0 until rightNKeys)
+      nodeAppendKV(left, i, old.getPtr(i + minRightId), old.getKey(i + minRightId), old.getVal(i + minRightId))
 
   }
 
