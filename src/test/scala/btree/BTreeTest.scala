@@ -26,7 +26,7 @@ class BTreeTest extends AnyFunSuite {
       (added, notAdded) <- kvSeq.indices.map(id => kvSeq.splitAt(id))
       (k, v) <- notAdded.headOption
     }
-      println(s"insert $k $v")
+      println(s"tree.insert(\"$k\", \"$v\")")
       tree.insert(k, v)
       assert(tree.getValue(k).contains(v))
       //test all keys
@@ -40,12 +40,13 @@ class BTreeTest extends AnyFunSuite {
     for ((removed, notRemoved) <- ro.indices.map(id => ro.splitAt(id));
          toRemove <- notRemoved.headOption
          ) {
-      println(s"delete $toRemove")
+      println(s"tree.delete(\"$toRemove\")")
       tree.delete(toRemove)
       assert(tree.getValue(toRemove).isEmpty)
       for (rk <- removed)
         assert(tree.getValue(rk).isEmpty)
       for (nrk <- notRemoved.tail)
+        println(nrk)
         assert(tree.getValue(nrk).nonEmpty)
     }
 
@@ -98,6 +99,20 @@ class BTreeTest extends AnyFunSuite {
     tree.insert("KEY2", "VALUE2")
     tree.insert("KEY3", "VALUE3")
     tree.insert("KEY4", "VALUE4")
+    assert(tree.getValue("KEY4").contains("VALUE4"))
+  }
+
+  test("bug #4") {
+    val tree = new InMemoryBTree
+    tree.insert("KEY1", "VALUE1")
+    tree.insert("KEY2", "VALUE2")
+    tree.insert("KEY5", "VALUE5")
+    tree.insert("KEY4", "VALUE4")
+    tree.insert("KEY3", "VALUE3")
+    tree.delete("KEY1")
+    tree.delete("KEY2")
+    tree.delete("KEY3")
+    tree.delete("KEY5")
     assert(tree.getValue("KEY4").contains("VALUE4"))
   }
 

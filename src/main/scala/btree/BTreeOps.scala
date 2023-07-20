@@ -95,7 +95,7 @@ object BTreeOps:
     tree.del(kptr)
     // recursive insertion to the kid node
     val knodeIns = treeInsert(tree, knode, key, value)
-    val splited = nodeSplit3(knode)
+    val splited = nodeSplit3(knodeIns)
     // update the kid links
     nodeReplaceKidN(tree, newNode, node, id, splited)
   end nodeInsert
@@ -195,11 +195,12 @@ object BTreeOps:
   def nodeMerge(newNode: BNode, left: BNode, right: BNode): Unit =
     newNode.setHeader(left.btype, left.nkeys + right.nkeys)
     nodeAppendRange(newNode, left, 0, 0, left.nkeys)
-    nodeAppendRange(newNode, left, left.nkeys, 0, right.nkeys)
+    nodeAppendRange(newNode, right, left.nkeys, 0, right.nkeys)
   end nodeMerge
 
+  // should the updated kid be merged with a sibling?
   def shouldMerge(tree: BTree, node: BNode, id: Int, updated: BNode): MergeDir =
-    if (updated.nbytes > BTREE_PAGE_SIZE / 4)
+    if (updated.nbytes > BTREE_PAGE_SIZE * BTREE_MERGE_FACTOR)
       MergeDir.NONE
     else if (id > 0 && {
       val sibling = tree.get(node.getPtr(id - 1))
@@ -233,8 +234,8 @@ object BTreeOps:
           case MergeDir.RIGHT(sibling) =>
             val merged = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
             nodeMerge(merged, updated, sibling)
-            tree.del(node.getPtr(id - 1))
-            nodeReplace2Kid(newNode, node, id - 1, tree.alloc(merged), merged.getKey(0))
+            tree.del(node.getPtr(id + 1))
+            nodeReplace2Kid(newNode, node, id, tree.alloc(merged), merged.getKey(0))
           case MergeDir.NONE =>
             //assert(updated.nkeys() > 0)
             nodeReplaceKidN(tree, newNode, node, id, Seq(updated))

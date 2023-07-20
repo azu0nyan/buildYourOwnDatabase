@@ -31,6 +31,7 @@ object BTree {
     val BTREE_PAGE_SIZE = 96
     val BTREE_MAX_KEY_SIZE = 32
     val BTREE_MAX_VAL_SIZE = 32
+    val BTREE_MERGE_FACTOR = 0.75 //0.25
     /**following structure of a packet*/
     val node1max = Sizes.HEADER + Sizes.pointers(1) + Sizes.offsets(1) + Sizes.klen + Sizes.vlen + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE
     assert(node1max < BTREE_PAGE_SIZE)
