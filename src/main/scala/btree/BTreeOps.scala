@@ -153,7 +153,7 @@ object BTreeOps:
     nodeAppendRange(newNode, old, id + kids.size, id + 1, old.nkeys - (id + 1))
   end nodeReplaceKidN
 
-  def nodeReplace2Kid(newNode: BNode, old: BNode, id: Int, ptr: Pointer, key: Array[Byte]) =
+  def nodeReplace2Kid(newNode: BNode, old: BNode, id: Int, ptr: Pointer, key: Array[Byte]): Unit =
     newNode.setHeader(BNODE_NODE, old.nkeys - 1)
     nodeAppendRange(newNode, old, 0, 0, id)
     nodeAppendKV(newNode, id, ptr, key, Array.ofDim[Byte](0))
@@ -240,15 +240,35 @@ object BTreeOps:
         Some(newNode)
       case None => None
   end nodeDelete
+  
+  def getValue(tree: BTree, node: BNode, key: Array[Byte]): Option[Array[Byte]] =
+    val id = node.nodeLookupLE(key)
+    node.btype match
+      case `BNODE_LEAF` =>
+        if (!util.Arrays.equals(key, node.getKey(id))) None
+        else Some(node.getVal(id))         
+      case `BNODE_NODE` =>
+        getValue(tree, node, key)
+      case _ =>
+        throw new RuntimeException(s"Bad node type ${node.btype}")
+  end getValue
 
+  def getValue(tree: BTree, key: Array[Byte]): Option[Array[Byte]] =
+    assert(key.length != 0)
+    assert(key.length <= BTREE_MAX_KEY_SIZE)
+    if(tree.root == 0) None
+    else getValue(tree, tree.get(tree.root), key)
+  end getValue   
+      
+    
   /**
    * The height of the tree will be reduced by one when:
    * 1. The root node is not a leaf.
    * 2. The root node has only one child.
    */
   def delete(tree: BTree, key: Array[Byte]): Boolean =
-  //assert(len(key) != 0)
-  //assert(len(key) <= BTREE_MAX_KEY_SIZE)
+    assert(key.length != 0)
+    assert(key.length <= BTREE_MAX_KEY_SIZE)
     if (tree.root == 0) false
     else
       treeDelete(tree, tree.get(tree.root), key) match
@@ -264,9 +284,9 @@ object BTreeOps:
   end delete
 
   def insert(tree: BTree, key: Array[Byte], value: Array[Byte]): Unit =
-  //assert(len(key) != 0)
-  //assert(len(key) <= BTREE_MAX_KEY_SIZE)
-  //assert(len(val) <= BTREE_MAX_VAL_SIZE)
+    assert(key.length != 0)
+    assert(key.length <= BTREE_MAX_KEY_SIZE)
+    assert(value.length <= BTREE_MAX_VAL_SIZE)
     if (tree.root == 0)
       //create first node
       val root = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
