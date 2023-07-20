@@ -154,11 +154,72 @@ object BTreeOps:
   end nodeReplaceKidN
 
 
-  def leafDelete(newNode: BNode, old: BNode, id: Int): Unit = {
+  /** remove a key from a leaf node */
+  def leafDelete(newNode: BNode, old: BNode, id: Int): Unit =
     newNode.setHeader(BNODE_LEAF, old.nkeys - 1)
     nodeAppendRange(newNode, old, 0, 0, id)
     nodeAppendRange(newNode, old, id, id + 1, old.nkeys - (id + 1))
-  }
+  end leafDelete
+
+
+  /** delete a key from the tree */
+  def treeDelete(tree: BTree, node: BNode, key: Array[Byte]): Option[BNode] =
+    val id = node.nodeLookupLE(key)
+    node.btype match
+      case `BNODE_LEAF` =>
+        if (!util.Arrays.equals(key, node.getKey(id))) None
+        else
+          val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+          leafDelete(newNode, node, id)
+          Some(newNode)
+      case `BNODE_NODE` =>
+        nodeDelete(tree, node, id, key)
+      case _ =>
+        throw new RuntimeException(s"Bad node type ${node.btype}")
+  end treeDelete
+
+  enum MergeDir:
+    case NONE
+    case LEFT(sibling: BNode)
+    case RIGHT(sibling: BNode)
+
+  def nodeMerge(newNode: BNode, left: BNode, right: BNode): Unit =
+    newNode.setHeader(left.btype, left.nkeys + right.nkeys)
+    nodeAppendRange(newNode, left, 0, 0, left.nkeys)
+    nodeAppendRange(newNode, left, left.nkeys, 0, right.nkeys)
+  end nodeMerge
+
+  def shouldMerge(tree: BTree, node: BNode, id: Int, updated: BNode): MergeDir = ???
+
+
+  def nodeReplace2Kid(newNode: BNode, node: BNode, id: Int, ptr: Pointer, key: Array[Byte]) = ???
+  def nodeReplaceKidN(tree: BTree, newNode: BNode, node: BNode, id: Int, updated: BNode) = ???
+
+  def nodeDelete(tree: BTree, node: BNode, id: Int, key: Array[Byte]): Option[BNode] =
+    val kptr = node.getPtr(id)
+    treeDelete(tree, tree.get(kptr).get, key) match
+      case Some(updated) =>
+        tree.del(kptr)
+        val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+
+        shouldMerge(tree, node, id, updated) match
+          case MergeDir.LEFT(sibling) =>
+            val merged = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+            nodeMerge(merged, sibling, updated)
+            tree.del(node.getPtr(id - 1))
+            nodeReplace2Kid(newNode, node, id - 1, tree.alloc(merged), merged.getKey(0))
+          case MergeDir.RIGHT(sibling) =>
+            val merged = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+            nodeMerge(merged, updated, sibling)
+            tree.del(node.getPtr(id - 1))
+            nodeReplace2Kid(newNode, node, id - 1, tree.alloc(merged), merged.getKey(0))
+          case MergeDir.NONE =>
+            //assert(updated.nkeys() > 0)
+            nodeReplaceKidN(tree, newNode, node, id, updated)
+        Some(newNode)
+      case None => None
+  end nodeDelete
+
 
 end BTreeOps
 
