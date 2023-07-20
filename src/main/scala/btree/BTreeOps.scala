@@ -124,9 +124,10 @@ object BTreeOps:
       nodeAppendKV(left, i, old.getPtr(i), old.getKey(i), old.getVal(i))
 
     for (i <- 0 until rightNKeys)
-      nodeAppendKV(left, i, old.getPtr(i + minRightId), old.getKey(i + minRightId), old.getVal(i + minRightId))
+      nodeAppendKV(right, i, old.getPtr(i + minRightId), old.getKey(i + minRightId), old.getVal(i + minRightId))
 
   }
+
 
   def nodeSplit3(old: BNode): Seq[BNode] =
     if (old.nbytes <= BTREE_PAGE_SIZE)
@@ -245,11 +246,10 @@ object BTreeOps:
     val id = node.nodeLookupLE(key)
     node.btype match
       case `BNODE_LEAF` =>
-        println("here"+ id + " "  + node.getKey(id).mkString(",") + " " + key.mkString(","))
         if (!util.Arrays.equals(key, node.getKey(id))) None
         else Some(node.getVal(id))
       case `BNODE_NODE` =>
-        getValue(tree, node, key)
+        getValue(tree, tree.get(node.getPtr(id)), key)
       case _ =>
         throw new RuntimeException(s"Bad node type ${node.btype}")
   end getValue
