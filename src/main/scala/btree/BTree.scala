@@ -22,15 +22,15 @@ object BTree {
     def offsetlen = 4
   }
 
-    
+
   object Const {
     val BNODE_NODE = 1
     val BNODE_LEAF = 2
 
 
-    val BTREE_PAGE_SIZE = 4096
-    val BTREE_MAX_KEY_SIZE = 1000
-    val BTREE_MAX_VAL_SIZE = 3000
+    val BTREE_PAGE_SIZE = 96
+    val BTREE_MAX_KEY_SIZE = 32
+    val BTREE_MAX_VAL_SIZE = 32
     /**following structure of a packet*/
     val node1max = Sizes.HEADER + Sizes.pointers(1) + Sizes.offsets(1) + Sizes.klen + Sizes.vlen + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE
     assert(node1max < BTREE_PAGE_SIZE)
@@ -40,8 +40,8 @@ object BTree {
 
   type Pointer = Long
   trait BTree {
-    
-    def setRoot(p: Pointer): Unit 
+
+    def setRoot(p: Pointer): Unit
     // pointer (a nonzero page number)
     def root: Pointer
     // callbacks for managing on-disk pages
@@ -52,7 +52,7 @@ object BTree {
     /**delete page*/
     def del(p: Pointer): Unit
   }
- 
+
 
 
 

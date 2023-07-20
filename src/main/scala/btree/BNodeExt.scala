@@ -38,7 +38,7 @@ extension (node: BNode)
   */
   def offsetPos(id: Int): Int =
   //assert(1 <= id && id <= node.nkeys) todo check
-    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * (id - 1))
+    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * (id - 1)) // 8 + 2 * 8 + 0 = 24
 
   def getOffset(id: Int): Int =
     if (id == 0) 0
@@ -49,20 +49,28 @@ extension (node: BNode)
 
   def kvPos(id: Int): Int =
   //assert(id <= nkeys)
-    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.klen * nkeys + getOffset(id))
+    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * nkeys + getOffset(id)) //8 + 2 * 8 + 2 * 4 + 8 = 32 + 8
 
   def getKey(id: Int): Array[Byte] =
     //assert(id < nkeys)
     val pos = kvPos(id)
     val klen = ByteBuffer.wrap(node.data).getInt(pos)
-    ByteBuffer.wrap(node.data).slice(pos + 4, klen).array()
+    val res = Array.ofDim[Byte](klen)
+    ByteBuffer.wrap(node.data).slice(pos + Sizes.kvLen, klen).get(res)
+    res
+  end getKey
+
 
   def getVal(id: Int): Array[Byte] =
     //assert(id < nkeys)
     val pos = kvPos(id)
     val klen = ByteBuffer.wrap(node.data).getInt(pos)
     val vlen = ByteBuffer.wrap(node.data).getInt(pos + Sizes.vlen)
-    ByteBuffer.wrap(node.data).slice(pos + 4 + klen, vlen).array()
+    val res = Array.ofDim[Byte](vlen)
+    ByteBuffer.wrap(node.data).slice(pos + Sizes.kvLen + klen, vlen).get(res)
+    res
+  end getVal
+
 
   def nbytes: Int = kvPos(nkeys)
 
@@ -84,6 +92,7 @@ extension (node: BNode)
           id
         else id - 1
     kRec(0) // can be 1
+  end nodeLookupLE
 
 
 end extension

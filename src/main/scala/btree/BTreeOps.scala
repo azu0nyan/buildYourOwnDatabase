@@ -240,13 +240,14 @@ object BTreeOps:
         Some(newNode)
       case None => None
   end nodeDelete
-  
+
   def getValue(tree: BTree, node: BNode, key: Array[Byte]): Option[Array[Byte]] =
     val id = node.nodeLookupLE(key)
     node.btype match
       case `BNODE_LEAF` =>
+        println("here"+ id + " "  + node.getKey(id).mkString(",") + " " + key.mkString(","))
         if (!util.Arrays.equals(key, node.getKey(id))) None
-        else Some(node.getVal(id))         
+        else Some(node.getVal(id))
       case `BNODE_NODE` =>
         getValue(tree, node, key)
       case _ =>
@@ -258,9 +259,9 @@ object BTreeOps:
     assert(key.length <= BTREE_MAX_KEY_SIZE)
     if(tree.root == 0) None
     else getValue(tree, tree.get(tree.root), key)
-  end getValue   
-      
-    
+  end getValue
+
+
   /**
    * The height of the tree will be reduced by one when:
    * 1. The root node is not a leaf.

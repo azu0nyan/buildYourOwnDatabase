@@ -8,7 +8,7 @@ class InMemoryBTree extends BTree {
 
   val m: mutable.Map[Pointer, BNode] = mutable.Map()
   var _root: Pointer = 0L
-  var mId = 0L
+  var mId = 1L
 
   def setRoot(p: Pointer): Unit = _root = p
   // pointer (a nonzero page number)
