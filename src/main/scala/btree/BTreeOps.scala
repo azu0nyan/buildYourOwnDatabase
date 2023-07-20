@@ -238,7 +238,10 @@ object BTreeOps:
             nodeReplace2Kid(newNode, node, id, tree.alloc(merged), merged.getKey(0))
           case MergeDir.NONE =>
             //assert(updated.nkeys() > 0)
-            nodeReplaceKidN(tree, newNode, node, id, Seq(updated))
+            if(updated.nkeys > 0)
+              nodeReplaceKidN(tree, newNode, node, id, Seq(updated))
+            else
+              nodeReplaceKidN(tree, newNode, node, id, Seq())
         Some(newNode)
       case None => None
   end nodeDelete

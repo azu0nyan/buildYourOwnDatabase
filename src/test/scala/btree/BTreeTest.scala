@@ -14,8 +14,8 @@ class BTreeTest extends AnyFunSuite {
     assert(tree.getValue("kek").isEmpty)
   }
 
-  def testFor(kvSeq: Seq[(String, String)], removeOrder: Option[Seq[String]] = None) =
-    println(s"Testing for $kvSeq $removeOrder")
+  def testFor(kvSeq: Seq[(String, String)], removeOrder: Option[Seq[String]] = None, print: Boolean = false) =
+    if (print) println(s"Testing for $kvSeq $removeOrder")
     val tree = new InMemoryBTree
     val keys = kvSeq.map(_._1)
     val values = kvSeq.map(_._2)
@@ -26,7 +26,7 @@ class BTreeTest extends AnyFunSuite {
       (added, notAdded) <- kvSeq.indices.map(id => kvSeq.splitAt(id))
       (k, v) <- notAdded.headOption
     }
-      println(s"tree.insert(\"$k\", \"$v\")")
+      if (print) println(s"tree.insert(\"$k\", \"$v\")")
       tree.insert(k, v)
       assert(tree.getValue(k).contains(v))
       //test all keys
@@ -40,43 +40,47 @@ class BTreeTest extends AnyFunSuite {
     for ((removed, notRemoved) <- ro.indices.map(id => ro.splitAt(id));
          toRemove <- notRemoved.headOption
          ) {
-      println(s"tree.delete(\"$toRemove\")")
+      if (print) println(s"tree.delete(\"$toRemove\")")
       tree.delete(toRemove)
       assert(tree.getValue(toRemove).isEmpty)
       for (rk <- removed)
         assert(tree.getValue(rk).isEmpty)
       for (nrk <- notRemoved.tail)
-        println(nrk)
+        if (print) println(nrk)
         assert(tree.getValue(nrk).nonEmpty)
     }
 
   end testFor
 
-  def testMany(n: Int) =
+  def testManyPermutated(n: Int) =
     val kvs = (1 to n).map(i => (s"KEY$i", s"VALUE$i"))
     for (s <- kvs.permutations; r <- kvs.map(_._1).permutations)
       testFor(s, Some(r))
-  end testMany
+  end testManyPermutated
 
 
   test("Insert delete one(2)") {
-    testMany(1)
+    testManyPermutated(1)
   }
 
   test("Insert delete two") {
-    testMany(2)
+    testManyPermutated(2)
   }
 
   test("Insert delete three") {
-    testMany(3)
+    testManyPermutated(3)
   }
 
-  test("Insert delete many"){
-    for(i <- 4 until 33){
-      testMany(i)
+  test("Insert delete many permutated") {
+    for (i <- 4 until 6) {
+      testManyPermutated(i)
     }
   }
 
+  test("Insert delete many") {
+    val kvs = (1 to 1024).map(i => (s"KEY$i", s"VALUE$i"))
+    testFor(kvs)
+  }
 
   test("bug #1") {
     val tree = new InMemoryBTree
@@ -116,5 +120,16 @@ class BTreeTest extends AnyFunSuite {
     assert(tree.getValue("KEY4").contains("VALUE4"))
   }
 
-
+  test("bug #5") {
+    val tree = new InMemoryBTree
+    tree.insert("KEY1", "VALUE1")
+    tree.insert("KEY2", "VALUE2")
+    tree.insert("KEY5", "VALUE5")
+    tree.insert("KEY4", "VALUE4")
+    tree.insert("KEY3", "VALUE3")
+    tree.delete("KEY5")
+    tree.delete("KEY1")
+    tree.delete("KEY2")
+    assert(tree.getValue("KEY3").contains("VALUE3"))
+  }
 }
