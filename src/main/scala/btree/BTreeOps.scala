@@ -76,7 +76,7 @@ object BTreeOps:
           leafUpdate(newNode, node, id, key, value)
         else
         //// insert it after the position.
-          leafInsert(newNode, node, id, key, value)
+          leafInsert(newNode, node, id + 1, key, value)
       case `BNODE_NODE` =>
         // internal node, insert it to a kid node.
         nodeInsert(tree, newNode, node, id, key, value)
