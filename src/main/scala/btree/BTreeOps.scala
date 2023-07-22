@@ -171,15 +171,15 @@ object BTreeOps:
 
 
   /** delete a key from the tree */
-  def treeDelete(tree: BTree, node: BNode, key: Array[Byte]): Option[BNode] =
+  def treeDelete(tree: BTree, node: BNode, key: Array[Byte]): Seq[BNode] =
     val id = node.nodeLookupLE(key)
     node.btype match
       case `BNODE_LEAF` =>
-        if (!util.Arrays.equals(key, node.getKey(id))) None
+        if (!util.Arrays.equals(key, node.getKey(id))) Seq()
         else
           val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
           leafDelete(newNode, node, id)
-          Some(newNode)
+          Seq(newNode)
       case `BNODE_NODE` =>
         nodeDelete(tree, node, id, key)
       case _ =>
@@ -217,13 +217,16 @@ object BTreeOps:
       MergeDir.NONE
 
 
-  def nodeDelete(tree: BTree, node: BNode, id: Int, key: Array[Byte]): Option[BNode] =
+  def nodeDelete(tree: BTree, node: BNode, id: Int, key: Array[Byte]): Seq[BNode] =
     val kptr = node.getPtr(id)
-    treeDelete(tree, tree.get(kptr), key) match
-      case Some(updated) =>
-        tree.del(kptr)
-        val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
-
+    val updatedMany = treeDelete(tree, tree.get(kptr), key)
+    if(updatedMany.isEmpty)
+      Seq()
+    else
+      tree.del(kptr)
+      if(updatedMany.length == 1)
+        val updated = updatedMany.head
+        val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE * 2))
         shouldMerge(tree, node, id, updated) match
           case MergeDir.LEFT(sibling) =>
             val merged = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
@@ -236,12 +239,15 @@ object BTreeOps:
             tree.del(node.getPtr(id + 1))
             nodeReplace2Kid(newNode, node, id, tree.alloc(merged), merged.getKey(0))
           case MergeDir.NONE =>
-            if(updated.nkeys > 0)
-              nodeReplaceKidN(tree, newNode, node, id, Seq(updated))//todo fix bug when replace kid can increase length of key
+            if (updated.nkeys > 0)//can increase node size if replaced key shorter than replacement
+              nodeReplaceKidN(tree, newNode, node, id, Seq(updated))
             else
               nodeReplaceKidN(tree, newNode, node, id, Seq())
-        Some(newNode)
-      case None => None
+        nodeSplit3(newNode)
+      else
+        val newNode = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE * 2))
+        nodeReplaceKidN(tree, newNode, node, id, updatedMany)
+        nodeSplit3(newNode)
   end nodeDelete
 
   def getValue(tree: BTree, node: BNode, key: Array[Byte]): Option[Array[Byte]] =
@@ -274,16 +280,26 @@ object BTreeOps:
     assert(key.length <= BTREE_MAX_KEY_SIZE)
     if (tree.root == 0) false
     else
-      treeDelete(tree, tree.get(tree.root), key) match
-        case Some(updated) =>
-          tree.del(tree.root)
-          if (updated.btype == BNODE_NODE && updated.nkeys == 1)
-            tree.setRoot(updated.getPtr(0))
-          else
-            tree.setRoot(tree.alloc(updated))
-          true
-        case None =>
-          false
+      val deleteMany = treeDelete(tree, tree.get(tree.root), key)
+      if(deleteMany.isEmpty) false
+      else if(deleteMany.size == 1)
+        val updated = deleteMany.head
+        tree.del(tree.root)
+        if (updated.btype == BNODE_NODE && updated.nkeys == 1)
+          tree.setRoot(updated.getPtr(0))
+        else
+          tree.setRoot(tree.alloc(updated))
+        true
+      else
+        // the root was split, add a new level.
+        val root = new BNode(Array.ofDim[Byte](BTREE_PAGE_SIZE))
+        root.setHeader(BNODE_NODE, deleteMany.size)
+        for ((knode, id) <- deleteMany.zipWithIndex)
+          val kptr = tree.alloc(knode)
+          val kkey = knode.getKey(0)
+          nodeAppendKV(root, id, kptr, kkey, Array.ofDim[Byte](0))
+        tree.setRoot(tree.alloc(root))
+        true
   end delete
 
   def insert(tree: BTree, key: Array[Byte], value: Array[Byte]): Unit =
