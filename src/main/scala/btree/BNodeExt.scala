@@ -1,6 +1,6 @@
 package btree
 
-import btree.BTree.Const.BNODE_LEAF
+import btree.BTree.Const.{BNODE_LEAF, BNODE_NODE}
 import btree.BTree.{BNode, Pointer, Sizes}
 
 import java.nio.ByteBuffer
@@ -15,6 +15,22 @@ This is the format of the KV pair. Lengths followed by data.
 | 4B   | 4B   | ... | ... |
 */
 extension (node: BNode)
+
+
+  def prettyPrint: Unit = try {
+    println("TYPE | KEYS |" + (0 until nkeys).map(i => f"p$i%-4d |").mkString("") +
+      (0 until nkeys).map(i => f"k$i%-8d| v$i%-8d|").mkString(""))
+    print(if (btype == BNODE_NODE) "NODE |" else "LEAF |")
+    print(f" ${nkeys}%-4d |")
+    print((0 until nkeys).map(i => f" ${getPtr(i)}%-4d |").mkString(""))
+    for (i <- 0 until nkeys)
+      print(f"${new String(getKey(i))}%-8s| ${new String(getVal(i))}%-8s |")
+    println()
+  } catch {
+    case t: Throwable => println(s"MALFORMED NODE")
+  }
+  end prettyPrint
+
   def btype: Int = ByteBuffer.wrap(node.data).getInt(0)
   def nkeys: Int = ByteBuffer.wrap(node.data).getInt(4)
   def setHeader(btype: Int, nkeys: Int): Unit =

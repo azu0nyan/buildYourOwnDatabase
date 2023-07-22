@@ -82,7 +82,6 @@ object BTreeOps:
         nodeInsert(tree, newNode, node, id, key, value)
       case _ =>
         throw new RuntimeException(s"Bad node type ${node.btype}")
-
     newNode
 
   end treeInsert
@@ -107,7 +106,7 @@ object BTreeOps:
   def nodeSplit2(left: BNode, right: BNode, old: BNode): Unit = {
     val kvOverhead = Sizes.psize + Sizes.kvLen
 
-    val (rightSize, minRightId) = ((old.nkeys - 1) to 0).foldRight((Sizes.HEADER, old.nkeys - 1)) {
+    val (rightSize, minRightId) = ((old.nkeys - 1) to 0 by -1).foldRight((Sizes.HEADER, old.nkeys - 1)) {
       case (id, (currentSize, minId)) =>
         val kvLen = old.getKey(id).length + old.getVal(id).length //todo use offsets to calculate or mb do NodeAppend while traversing
         if (currentSize + kvOverhead + kvLen <= BTREE_PAGE_SIZE)
@@ -117,7 +116,7 @@ object BTreeOps:
     }
 
     val rightNKeys = old.nkeys - minRightId
-    left.setHeader(old.btype, minRightId) //todo check header
+    left.setHeader(old.btype, minRightId)
     right.setHeader(old.btype, rightNKeys)
 
     for (i <- 0 until minRightId)
@@ -237,9 +236,8 @@ object BTreeOps:
             tree.del(node.getPtr(id + 1))
             nodeReplace2Kid(newNode, node, id, tree.alloc(merged), merged.getKey(0))
           case MergeDir.NONE =>
-            //assert(updated.nkeys() > 0)
             if(updated.nkeys > 0)
-              nodeReplaceKidN(tree, newNode, node, id, Seq(updated))
+              nodeReplaceKidN(tree, newNode, node, id, Seq(updated))//todo fix bug when replace kid can increase length of key
             else
               nodeReplaceKidN(tree, newNode, node, id, Seq())
         Some(newNode)

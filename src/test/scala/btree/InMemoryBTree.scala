@@ -17,7 +17,7 @@ class InMemoryBTree extends BTree {
   /** dereference a pointer */
   def get(p: Pointer): BNode = m(p)
   /** allocate new page */
-  def alloc(bnode: BNode): Pointer = {
+  def alloc(bnode: BNode): Pointer = {    
     val ptr = mId
     mId += 1
     m += ptr -> bnode
