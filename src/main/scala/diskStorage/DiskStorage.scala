@@ -3,7 +3,7 @@ package diskStorage
 import btree.BTree.Pointer
 
 import java.io.RandomAccessFile
-import java.nio.MappedByteBuffer
+import java.nio.{ByteBuffer, MappedByteBuffer}
 import java.nio.channels.FileChannel
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
@@ -39,8 +39,24 @@ class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams())
   private def makeChunk(id: Int): MappedByteBuffer =
     file.getChannel.map(FileChannel.MapMode.READ_WRITE, id * params.chunkSize, params.chunkSize)
 
-  private val mappedBuffers = mutable.Buffer(makeChunk(0))
-  private val eofPointer = AtomicLong(0)
+  private val mappedBuffersChunks = mutable.Buffer(makeChunk(0))
+  private val flushed:Long = params.pageSize
+  private val eofPointer = AtomicLong(params.pageSize)
+
+  private val masterPage = Array.ofDim[Byte](params.pageSize)
+  file.read(masterPage, 0, params.pageSize)
+
+  def writeMasterPage(userData: Array[Byte]): Unit =
+    ByteBuffer.wrap(masterPage)
+      .position(0)
+      .putLong(eofPointer.get())
+      .put(userData)
+    val chunk = getChunk(0)
+    chunk.put(0, masterPage)
+    chunk.force(0, params.pageSize)
+  end writeMasterPage
+
+  def getUserData: ByteBuffer = ByteBuffer.wrap(masterPage, 8, params.pageSize - 8)
 
   private def chunkId(p: Pointer): Int = (p >>> 32).toInt
 
@@ -48,11 +64,11 @@ class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams())
 
   def getChunk(p: Pointer): MappedByteBuffer =
     val cId = chunkId(p)
-    if (cId < mappedBuffers.size)
-      mappedBuffers(cId)
+    if (cId < mappedBuffersChunks.size)
+      mappedBuffersChunks(cId)
     else this.synchronized {
-      val c = makeChunk(mappedBuffers.size)
-      mappedBuffers += c
+      val c = makeChunk(mappedBuffersChunks.size)
+      mappedBuffersChunks += c
       c
     }
   end getChunk
@@ -76,6 +92,24 @@ class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams())
   def pageDel(p: Pointer): Unit =
     ()
   end pageDel
+  
+  def flushPages(): Unit =
+    val start = chunkId(flushed)
+    val flushEnd = eofPointer.get()
+    val end = chunkId(flushEnd)
+    for{      
+      i <- start to end 
+      chunk = mappedBuffersChunks(i)
+    } {
+      if(i == start && start == end)
+        val d = inChunkOffset(flushEnd) - inChunkOffset(flushed)
+        chunk.force(inChunkOffset(start), d)
+      else if(i == start)
+        chunk.force(inChunkOffset(flushed), chunk.capacity() - inChunkOffset(flushed))
+      else if(i == end )
+        chunk.force(0, inChunkOffset(flushEnd))
+      else chunk.force()      
+    }
 
 end DiskStorage
 
