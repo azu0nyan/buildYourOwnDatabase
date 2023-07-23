@@ -38,12 +38,12 @@ extension (node: BNode)
 
   def getPtr(id: Int): Pointer =
     //assert(id < node.nkeys) todo check
-    val pos = Sizes.HEADER + Sizes.psize * id
+    val pos = Sizes.HEADER + Sizes.pointerSize * id
     ByteBuffer.wrap(node.data).getLong(pos)
 
   def setPtr(id: Int, ptr: Pointer): Unit =
     //assert(id < node.nkeys) todo check
-    val pos = Sizes.HEADER + Sizes.psize * id
+    val pos = Sizes.HEADER + Sizes.pointerSize * id
     ByteBuffer.wrap(node.data).putLong(pos, ptr)
 
   /*
@@ -54,7 +54,7 @@ extension (node: BNode)
   */
   def offsetPos(id: Int): Int =
   //assert(1 <= id && id <= node.nkeys) todo check
-    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * (id - 1)) // 8 + 2 * 8 + 0 = 24
+    (Sizes.HEADER + Sizes.pointerSize * nkeys + Sizes.offsetlen * (id - 1)) // 8 + 2 * 8 + 0 = 24
 
   def getOffset(id: Int): Int =
     if (id == 0) 0
@@ -65,7 +65,7 @@ extension (node: BNode)
 
   def kvPos(id: Int): Int =
   //assert(id <= nkeys)
-    (Sizes.HEADER + Sizes.psize * nkeys + Sizes.offsetlen * nkeys + getOffset(id)) //8 + 2 * 8 + 2 * 4 + 8 = 32 + 8
+    (Sizes.HEADER + Sizes.pointerSize * nkeys + Sizes.offsetlen * nkeys + getOffset(id)) //8 + 2 * 8 + 2 * 4 + 8 = 32 + 8
 
   def getKey(id: Int): Array[Byte] =
     //assert(id < nkeys)

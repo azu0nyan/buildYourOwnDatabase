@@ -104,7 +104,7 @@ object BTreeOps:
    * // the second node always fits on a page.
    */
   def nodeSplit2(left: BNode, right: BNode, old: BNode): Unit = {
-    val kvOverhead = Sizes.psize + Sizes.kvLen
+    val kvOverhead = Sizes.pointerSize + Sizes.kvLen
 
     val (rightSize, minRightId) = ((old.nkeys - 1) to 0 by -1).foldRight((Sizes.HEADER, old.nkeys - 1)) {
       case (id, (currentSize, minId)) =>

@@ -9,9 +9,9 @@ object BTree {
     def nodeType = `type`
 
     def nkeys = 4
-    def psize = 8
+    def pointerSize = 8
     /** used keys instead of nkeys */
-    def pointers(keys:Int) = (psize * keys)
+    def pointers(keys:Int) = (pointerSize * keys)
     def offsets(keys:Int) = (keys * 2)
 
     val HEADER = Sizes.`type` + Sizes.nkeys
