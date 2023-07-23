@@ -1,18 +1,27 @@
 package db
 
-import btree.{BTree, BTreeOps}
+import btree.{BTree, BTreeOps, prettyPrint}
 import btree.BTree.{BNode, BTree, Pointer}
 import diskStorage.DiskStorage
 
 import java.nio.ByteBuffer
 
 class DiskKV(file: String) extends KV {
+  val printVerbose = false
 
   val storage = new DiskStorage(file)
 
   val btree = new BTree {
-    var _root = storage.getUserData.position(0).getLong
-    def setRoot(p: Pointer): Unit = _root = p
+    var _root = {
+      val readRoot = storage.getUserData.position(0).getLong
+      if (storage.isEmpty) 0 else
+        readRoot
+    }
+    println(s"Init btree with root $_root")
+    def setRoot(p: Pointer): Unit = {
+      if(printVerbose) println(s"Root changed to $p")
+      _root = p
+    }
     def root: Pointer = _root
     def get(p: Pointer): BNode = BNode(storage.pageGet(p))
     def alloc(bnode: BNode): Pointer = storage.pageNew(bnode.data)
@@ -32,6 +41,7 @@ class DiskKV(file: String) extends KV {
     BTreeOps.insert(btree, key, value)
     storage.flushPages()
     storage.writeMasterPage(masterPageData())
+    if(printVerbose)btree.get(btree.root).prettyPrint
 
   override def delete(key: Array[Byte]): Boolean =
     val res = BTreeOps.delete(btree, key)

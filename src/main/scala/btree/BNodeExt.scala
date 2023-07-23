@@ -69,7 +69,7 @@ extension (node: BNode)
 
   def getKey(id: Int): Array[Byte] =
     //assert(id < nkeys)
-    val pos = kvPos(id)
+    val pos = kvPos(id)    
     val klen = ByteBuffer.wrap(node.data).getInt(pos)
     val res = Array.ofDim[Byte](klen)
     ByteBuffer.wrap(node.data).slice(pos + Sizes.kvLen, klen).get(res)

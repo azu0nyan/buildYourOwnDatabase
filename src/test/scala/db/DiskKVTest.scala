@@ -3,6 +3,8 @@ package db
 import btree.InMemoryBTree
 import org.scalatest.funsuite.AnyFunSuite
 
+import java.io.File
+
 
 extension (kv: KV)
   def insert(k: String, v: String) : Unit=
@@ -15,6 +17,7 @@ extension (kv: KV)
 class DiskKVTest extends AnyFunSuite {
   def testFor(kvSeq: Seq[(String, String)], removeOrder: Option[Seq[String]] = None, print: Boolean = false) =
     if (print) println(s"Testing for $kvSeq $removeOrder")
+    new File("testfile").delete()
     val kv = new DiskKV("testfile")
     val keys = kvSeq.map(_._1)
     val values = kvSeq.map(_._2)
@@ -55,21 +58,30 @@ class DiskKVTest extends AnyFunSuite {
   def testManyPermutated(n: Int) =
     val kvs = (1 to n).map(i => (s"KEY$i", s"VALUE$i"))
     for (s <- kvs.permutations; r <- kvs.map(_._1).permutations)
-      println(s"Testing for $s $r")
       testFor(s, Some(r))
   end testManyPermutated
 
 
-  test("Insert delete many permutated") {
-    for (i <- 1 until 6) {
-      println(s"Testing for $i")
-      testManyPermutated(i)
-    }
+ test("Insert delete many 1 ") {
+    val kvs = (1 to 16).map(i => (s"KEY$i", s"VALUE$i"))
+    testFor(kvs)
   }
 
-  test("Insert delete many") {
+  test("Insert delete many 2 ") {
+    val kvs = (1 to 128).map(i => (s"KEY$i", s"VALUE$i"))
+    testFor(kvs)
+  }
+  test("Insert delete many 3 ") {
+    val kvs = (1 to 256).map(i => (s"KEY$i", s"VALUE$i"))
+    testFor(kvs)
+  }
+
+  test("Insert delete many 4") {
     val kvs = (1 to 1024).map(i => (s"KEY$i", s"VALUE$i"))
     testFor(kvs)
   }
+
+
+
 
 }

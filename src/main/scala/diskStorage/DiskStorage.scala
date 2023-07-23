@@ -31,20 +31,36 @@ object DiskStorage {
 case class DiskStorageParams(
                               pageSize: Int = 128,
                               chunkSize: Int = 1024,
-                            )
+                            ) {
+}
 
 class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams()):
+
+  val printVerbose = false
   private val file = new RandomAccessFile(path, "rw")
+  private val masterPage = Array.ofDim[Byte](params.pageSize)
+  file.read(masterPage, 0, params.pageSize)
+
+  private val mappedBuffersChunks = mutable.Buffer(makeChunk(0))
+  private val flushed: Long = params.pageSize
+
+
+  private val eofPointer = AtomicLong {
+    val eof = ByteBuffer.wrap(masterPage)
+      .position(0)
+      .getLong(0)
+    if (eof == 0) params.pageSize //new file
+    else eof
+  }
+  println(s"Disk storage init finished.")
+  println(s"Total space ${eofPointer.get} bytes. ${pagesAllocated} pages.")
 
   private def makeChunk(id: Int): MappedByteBuffer =
     file.getChannel.map(FileChannel.MapMode.READ_WRITE, id * params.chunkSize, params.chunkSize)
 
-  private val mappedBuffersChunks = mutable.Buffer(makeChunk(0))
-  private val flushed:Long = params.pageSize
-  private val eofPointer = AtomicLong(params.pageSize)
+  def pagesAllocated: Long = eofPointer.get() / params.pageSize
 
-  private val masterPage = Array.ofDim[Byte](params.pageSize)
-  file.read(masterPage, 0, params.pageSize)
+  def isEmpty = pagesAllocated == 1 //only master page
 
   def writeMasterPage(userData: Array[Byte]): Unit =
     ByteBuffer.wrap(masterPage)
@@ -56,11 +72,13 @@ class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams())
     chunk.force(0, params.pageSize)
   end writeMasterPage
 
-  def getUserData: ByteBuffer = ByteBuffer.wrap(masterPage, 8, params.pageSize - 8)
+  def getUserData: ByteBuffer = ByteBuffer.wrap(masterPage).slice(8, params.pageSize - 8)
 
-  private def chunkId(p: Pointer): Int = (p >>> 32).toInt
+  private def chunkId(p: Pointer): Int = (p / params.chunkSize).toInt
 
-  private def inChunkOffset(p: Pointer): Int = (p & 0xFFFFFFFF).toInt
+  private def inChunkOffset(p: Pointer): Int = {
+    (p  % params.chunkSize).toInt
+  }
 
   def getChunk(p: Pointer): MappedByteBuffer =
     val cId = chunkId(p)
@@ -75,40 +93,44 @@ class DiskStorage(path: String, params: DiskStorageParams = DiskStorageParams())
 
 
   def pageNew(data: Array[Byte]): Pointer =
-    assert(data.length < params.pageSize)
+    assert(data.length <= params.pageSize)
     val ptr = eofPointer.getAndAdd(params.pageSize)
     val chunk = getChunk(ptr)
     val offset = inChunkOffset(ptr)
     chunk.put(offset, data)
+    if(printVerbose) println(s"New page at $chunk $offset ptr $ptr ${data.mkString(",")}")
     ptr
   end pageNew
 
-  def pageGet(p: Pointer): Array[Byte] =
+  def pageGet(ptr: Pointer): Array[Byte] =
     val res = Array.ofDim[Byte](params.pageSize)
-    getChunk(p).get(inChunkOffset(p), res)
+    val chunk = getChunk(ptr)
+    val offset = inChunkOffset(ptr)
+    chunk.get(offset, res)
+    if(printVerbose) println(s"Getting page for $ptr $chunk $offset ${res.mkString(",")}")
     res
   end pageGet
 
   def pageDel(p: Pointer): Unit =
     ()
   end pageDel
-  
+
   def flushPages(): Unit =
-    val start = chunkId(flushed)
+    val startChunk = chunkId(flushed)
     val flushEnd = eofPointer.get()
     val end = chunkId(flushEnd)
-    for{      
-      i <- start to end 
+    for {
+      i <- startChunk to end if mappedBuffersChunks.size > i
       chunk = mappedBuffersChunks(i)
     } {
-      if(i == start && start == end)
-        val d = inChunkOffset(flushEnd) - inChunkOffset(flushed)
-        chunk.force(inChunkOffset(start), d)
-      else if(i == start)
+      if (i == startChunk && startChunk == end)
+        val d = inChunkOffset(flushEnd) - inChunkOffset(startChunk)
+        chunk.force(inChunkOffset(startChunk), d)
+      else if (i == startChunk)
         chunk.force(inChunkOffset(flushed), chunk.capacity() - inChunkOffset(flushed))
-      else if(i == end )
+      else if (i == end)
         chunk.force(0, inChunkOffset(flushEnd))
-      else chunk.force()      
+      else chunk.force()
     }
 
 end DiskStorage
